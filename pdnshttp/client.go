@@ -99,7 +99,19 @@ func (c *Client) doRequest(ctx context.Context, method string, path string, out 
 	if res.StatusCode == http.StatusNotFound {
 		return ErrNotFound{URL: req.URL.String()}
 	} else if res.StatusCode >= 400 {
-		return ErrUnexpectedStatus{URL: req.URL.String(), StatusCode: res.StatusCode}
+		// Get a human readable error message
+		// from PowerDNS API response
+		var er ErrResponse
+
+		if err := json.NewDecoder(res.Body).Decode(&er); err != nil {
+			return err
+		}
+
+		return ErrUnexpectedStatus{
+			URL:         req.URL.String(),
+			StatusCode:  res.StatusCode,
+			ErrResponse: er,
+		}
 	}
 
 	if out != nil {
@@ -108,9 +120,7 @@ func (c *Client) doRequest(ctx context.Context, method string, path string, out 
 			return err
 		}
 
-		dec := json.NewDecoder(res.Body)
-		err = dec.Decode(out)
-		if err != nil {
+		if err := json.NewDecoder(res.Body).Decode(out); err != nil {
 			return err
 		}
 	}
